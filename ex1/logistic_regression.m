@@ -13,7 +13,8 @@ function [f,g] = logistic_regression(theta, X,y)
   f = 0;
   g = zeros(size(theta));
 
-
+  f = -sum(y.*log(sigmf(theta'*X,[1 0]))+(1-y).*log(1-sigmf(theta'*X,[1 0])))
+  g = X*(theta'*X-y)';
   %
   % TODO:  Compute the objective function by looping over the dataset and summing
   %        up the objective values for each example.  Store the result in 'f'.
