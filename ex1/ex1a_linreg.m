@@ -44,6 +44,7 @@ theta = rand(n,1);
 %
 tic;
 options = struct('MaxIter', 200);
+average = grad_check(@linear_regression, theta, 10, train.X, train.y);
 theta = minFunc(@linear_regression, theta, options, train.X, train.y);
 fprintf('Optimization took %f seconds.\n', toc);
 
