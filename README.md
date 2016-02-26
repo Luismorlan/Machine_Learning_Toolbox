@@ -1,11 +1,14 @@
-stanford_dl_ex
+Machine_Learning_Toolbox
 ==============
+This toolbox is a complete version of the course UFLDL.
 
-Programming exercises for the Stanford Unsupervised Feature Learning and Deep Learning Tutorial
+This repository contains all practise on http://ufldl.stanford.edu/tutorial
+The datasets can be donwloaded through this link http://ai.stanford.edu/~amaas/data/data.zip , and should be extracted to the folder /common.
+Current version is V1.0, which contains:
+* Linear Regression with gradient check.
+* Logistic Regression with gradient check.
+* Softmax Regression with gradient check.
+* size-changeable feedforward neural network with softmax output layer, and with 3 different choice of units: ReLU, Sigmoid, tanh.
 
-This repository contains starter code for the tutorial at http://ufldl.stanford.edu/tutorial
-
-If you have suggestions, questions, or bug reports, please submit contact:
-
-Andrew Maas ( amaas AT cs dot stanford.edu)
-Sameep Tandon (sameep AT stanford dot edu)
+If you have any questions, please do not hesitate to contact me at chenweilunster@gmail.com
+Weilun Chen.
