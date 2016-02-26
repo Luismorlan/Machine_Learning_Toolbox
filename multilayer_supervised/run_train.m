@@ -36,7 +36,7 @@ ei.activation_fun = 'logistic';
 stack = initialize_weights(ei);
 params = stack2params(stack);
 
-%% setup minfunc options
+% %% setup minfunc options
 options = [];
 options.display = 'iter';
 options.maxFunEvals = 1e6;
@@ -45,7 +45,8 @@ options.Method = 'lbfgs';
 %% run training
 [opt_params,opt_value,exitflag,output] = minFunc(@supervised_dnn_cost,...
     params,options,ei, data_train, labels_train);
-
+% options = struct('MaxIter', 200);
+% theta = minFunc(@supervised_dnn_cost, params, options, ei, data_train, labels_train);
 %% compute accuracy on the test and train set
 [~, ~, pred] = supervised_dnn_cost( opt_params, ei, data_test, [], true);
 [~,pred] = max(pred);

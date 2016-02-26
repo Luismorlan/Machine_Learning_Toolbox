@@ -1,72 +1,134 @@
-function [ cost, grad, pred_prob] = supervised_dnn_cost( theta, ei, data, labels, pred_only)
-%SPNETCOSTSLAVE Slave cost function for simple phone net
-%   Does all the work of cost / gradient computation
-%   Returns cost broken into cross-entropy, weight norm, and prox reg
-%        components (ceCost, wCost, pCost)
-
-%% default values
+function [ cost, grad, pred_prob] = supervised_dnn_cost(theta, ei, data, labels, pred_only)
 po = false;
 if exist('pred_only','var')
-  po = pred_only;
+    po = pred_only;
 end;
 
 %% reshape into network
-stack = params2stack(theta, ei);
 numHidden = numel(ei.layer_sizes) - 1;
+numSamples = size(data, 2);
 hAct = cell(numHidden+1, 1);
 gradStack = cell(numHidden+1, 1);
+stack = params2stack(theta, ei);
 %% forward prop
 %%% YOUR CODE HERE %%%
-if numHidden>=1,
-    hAct{1,1} = sigmoid(stack{1,1}.W*data+stack{1,1}.b*ones(1,size(data,2)));
-    for i = 1:numHidden-1,
-        hAct{i+1,1} = sigmoid(stack{i+1,1}.W*hAct{i,1}+stack{i+1,1}.b*ones(1,size(hAct{i,1},2)));
+% size_data = size(data)
+for l = 1 : numHidden
+    if l > 1
+        hAct{l} = stack{l}.W * hAct{l - 1} + repmat(stack{l}.b, 1, ...
+            numSamples);
+    else
+        %                 l = l
+        %                 size_W = size(stack{l}.W)
+        %                 size_data = size(data)
+        %                 size_b = size(stack{l}.b)
+        hAct{l} = stack{l}.W * data + repmat(stack{l}.b, 1, numSamples);
     end
-    temp = (stack{numHidden+1,1}.W*hAct{numHidden,1}+stack{numHidden+1,1}.b*ones(1,size(hAct{numHidden,1},2)));
-    temp_1 = exp(temp);
-    hAct{numHidden+1,1} = temp_1./(ones(size(temp_1,1),1)*sum(temp_1));
-else,
-    temp = (stack{1,1}.W*data+stack{1,1}.b*ones(1,size(data,2)));
-    temp_1 = exp(temp);
-    hAct{1,1} = temp_1./(ones(size(temp_1,1),1)*sum(temp_1));
+    switch ei.activation_fun
+        case 'logistic'
+            hAct{l} = sigmoid(hAct{l});
+        case 'relu'
+            hAct{l} = relu(hAct{l});
+        case 'softmax'
+            hAct{l} = softmax(hAct{l}, 1);
+        case 'softplus'
+            hAct{l} = softplus(hAct{l});
+        case 'tanh'
+            hAct{l} = tanh(hAct{l});
+    end
+    %     size_hAct_l = size(hAct{l})
 end
+
+l = numHidden+1;
+y_hat = stack{l}.W * hAct{l - 1} + repmat(stack{l}.b, 1, numSamples);
+y_hat = exp(y_hat);
+hAct{l} = bsxfun(@rdivide, y_hat, sum(y_hat, 1));
+[~, pred_labels] = max(hAct{l});
+pred_prob = hAct{l};
+% if numel(labels) > 0
+%     idx = pred_labels' == labels;
+%     num_right_labels = size(idx)
+% end
+
 %% return here if only predictions desired.
 if po
-  cost = -1; ceCost = -1; wCost = -1; numCorrect = -1;
-  grad = [];  
-  return;
+    cost = -1; ceCost = -1; wCost = -1; numCorrect = -1;
+    grad = [];
+    return;
 end;
 
 %% compute cost
 %%% YOUR CODE HERE %%%
-I = sub2ind(size(hAct{numHidden+1,1}),labels', 1:size(hAct{numHidden+1,1},2));
-cost = -sum(log(hAct{numHidden,1}(I)));
+% y_hat = log(hAct{numHidden+1});
+index = sub2ind(size(hAct{numHidden+1}), labels', 1:numSamples);
+ceCost = -sum(log(hAct{numHidden+1}(index)));
+
+
+% y_hat = exp(theta' * X); % (K - 1) * m
+% y_hat = [y_hat; ones(1, size(y_hat, 2))]; % K * m
+
+% y_hat_sum = sum(y_hat, 2); % K * 1
+% y_hat_sum(end, :) = 1; % K * 1
+% p_y = bsxfun(@rdivide, y_hat, y_hat_sum); % K * m
+% A = log(p_y); % K * m
+% index = sub2ind(size(y_hat), y, 1 : size(y_hat, 2));
+% A(end, :) = 0;
+% A(index); % m * 1
+% f = -sum(A(index));
+% indicator = zeros(size(p_y)); % K * m
+% indicator(index) = 1;
+% g = -X * (indicator - p_y)'; % K * n
+
 %% compute gradients using backpropagation
 %%% YOUR CODE HERE %%%
-conv = eye(ei.output_dim);
-bool = conv(:,labels);
+% Cross entroy gradient
+targets = zeros(size(hAct{numHidden+1})); % numLabels * numSamples
+targets(index) = 1;
+gradInput = hAct{numHidden+1} - targets;
 
-delta = (bool+hAct{numHidden+1,1});
-last_layer_grad_W = delta*hAct{numHidden,1}';
-last_layer_grad_b = delta*ones(size(data,2),1);
-
-gradStack{numHidden+1,1}.W = last_layer_grad_W;
-gradStack{numHidden+1,1}.b = last_layer_grad_b;
-
-for i = numHidden:-1:2,
-    delta = stack{i+1,1}.W'*delta;
-%    gradStack{i,1}.W = delta*hAct
+for l = numHidden+1 : -1 : 1
+    if l > numHidden
+        gradFunc = ones(size(gradInput));
+    else
+        switch ei.activation_fun
+            case 'logistic'
+                gradFunc = hAct{l} .* (1 - hAct{l});
+            case 'relu'
+                gradFunc = hAct{l} > 0;
+                %         case 'softmax'
+                %             hAct{l} = softmax(input, 1);
+                %         case 'softplus'
+                %             hAct{l} = softplus(input);
+            case 'tanh'
+                gradFunc = 1 - hAct{l} .^ 2;
+        end
+    end
+    gradOutput = gradInput .* gradFunc;
+    if l > 1
+        gradStack{l}.W = gradOutput * hAct{l-1}';
+    else
+        gradStack{l}.W = gradOutput * data';
+    end
+    gradStack{l}.b = sum(gradOutput, 2);
+    gradInput = stack{l}.W' * gradOutput;
 end
-
-a = stack{2,1}.W'*delta;
-delta = a.*(1-a);
-gradStack{1,1}.W = delta*data';
-gradStack{1,1}.b = delta*ones(size(data,2),1);
-
 
 
 %% compute weight penalty cost and gradient for non-bias terms
 %%% YOUR CODE HERE %%%
+
+wCost = 0;
+for l = 1:numHidden+1
+    wCost = wCost + .5 * ei.lambda * sum(stack{l}.W(:) .^ 2);
+end
+
+cost = ceCost + wCost;
+
+% Computing the gradient of the weight decay.
+for l = numHidden : -1 : 1
+    gradStack{l}.W = gradStack{l}.W + ei.lambda * stack{l}.W;
+end
+
 
 %% reshape gradients into vector
 [grad] = stack2params(gradStack);
